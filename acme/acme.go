@@ -1,30 +1,72 @@
 package acme
 
 import (
-	"time"
-
-	"github.com/go-acme/lego/v4/certcrypto"
-	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/registration"
-	"github.com/paraparty/acme-task/model"
+    publicca "cloud.google.com/go/security/publicca/apiv1beta1"
+    "cloud.google.com/go/security/publicca/apiv1beta1/publiccapb"
+    "context"
+    "encoding/json"
+    "fmt"
+    "github.com/go-acme/lego/v4/certcrypto"
+    "github.com/go-acme/lego/v4/lego"
+    "github.com/go-acme/lego/v4/registration"
+    "github.com/paraparty/acme-task/model"
+    "google.golang.org/api/option"
 )
 
-func NewClient(user *model.User) (*lego.Client, error) {
-	acmeConfig := lego.NewConfig(user)
-	acmeConfig.CADirURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
-	acmeConfig.Certificate.KeyType = certcrypto.EC256
-	acmeConfig.Certificate.Timeout = 7 * 24 * time.Hour
+func NewClient(config *model.Config, user *model.User) (*lego.Client, error) {
+    acmeConfig := lego.NewConfig(user)
+    acmeConfig.Certificate.KeyType = certcrypto.EC256
+    if config.Acme.Type == "google" {
+        acmeConfig.CADirURL = "https://dv.acme-v02.api.pki.goog/directory"
+        err := getGoogleAcmeAuth(config)
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	client, err := lego.NewClient(acmeConfig)
-	if err != nil {
-		return nil, err
-	}
+    client, err := lego.NewClient(acmeConfig)
+    if err != nil {
+        return nil, err
+    }
 
-	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
-	if err != nil {
-		return nil, err
-	}
-	user.Registration = reg
+    account := registration.RegisterEABOptions{
+        TermsOfServiceAgreed: true,
+        HmacEncoded:          config.Acme.HmacEncoded,
+        Kid:                  config.Acme.KeyId,
+    }
 
-	return client, nil
+    reg, err := client.Registration.RegisterWithExternalAccountBinding(account)
+    if err != nil {
+        return nil, err
+    }
+    user.Registration = reg
+
+    return client, nil
+}
+
+func getGoogleAcmeAuth(config *model.Config) error {
+    credential, err := json.Marshal(config.Acme.Details.Credential)
+    if err != nil {
+        return err
+    }
+
+    ctx := context.Background()
+    c, err := publicca.NewPublicCertificateAuthorityClient(ctx, option.WithCredentialsJSON(credential))
+    if err != nil {
+        return err
+    }
+    defer c.Close()
+
+    req := &publiccapb.CreateExternalAccountKeyRequest{
+        Parent:             fmt.Sprintf("projects/%s/locations/global", config.Acme.Details.Project),
+        ExternalAccountKey: &publiccapb.ExternalAccountKey{},
+    }
+    resp, err := c.CreateExternalAccountKey(ctx, req)
+    if err != nil {
+        return err
+    }
+    // TODO: Use resp.
+    config.Acme.KeyId = resp.KeyId
+    config.Acme.HmacEncoded = string(resp.B64MacKey)
+    return nil
 }

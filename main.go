@@ -5,8 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	"log"
-
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/providers/dns/tencentcloud"
@@ -14,6 +12,8 @@ import (
 	"github.com/paraparty/acme-task/configuration"
 	"github.com/paraparty/acme-task/handler"
 	"github.com/paraparty/acme-task/model"
+	"log"
+	"time"
 )
 
 func main() {
@@ -25,17 +25,17 @@ func main() {
 	config, err := configuration.ReadConfig()
 
 	user := &model.User{
-		Email: config.Email,
+		Email: config.Acme.Email,
 		Key:   privateKey,
 	}
 
-	acmeClient, err := acme.NewClient(user)
+	acmeClient, err := acme.NewClient(config, user)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, task := range config.Tasks {
-		err = doTask(acmeClient, &task)
+		err = doTask(config, acmeClient, &task)
 		if err != nil {
 			log.Printf("%v", err)
 		}
@@ -43,7 +43,7 @@ func main() {
 
 }
 
-func doTask(client *lego.Client, task *model.Task) error {
+func doTask(config *model.Config, client *lego.Client, task *model.Task) error {
 	err := resolveChallenge(client, task)
 	if err != nil {
 		return err
@@ -53,6 +53,17 @@ func doTask(client *lego.Client, task *model.Task) error {
 		Domains: task.Domains,
 		Bundle:  true,
 	}
+	if config.Acme.Type == "google" {
+		if config.Acme.ValidityPeriod != "" {
+			duration, err := time.ParseDuration(config.Acme.ValidityPeriod)
+			if err == nil {
+				request.NotAfter = time.Now().Add(duration).Format(time.RFC3339)
+			} else {
+				log.Printf("ValidityPeriod is not acceptable, %v", err)
+			}
+		}
+	}
+
 	certificates, err := client.Certificate.Obtain(request)
 	if err != nil {
 		return err
