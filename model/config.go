@@ -31,13 +31,21 @@ type Challenge struct {
 }
 
 type TaskDetails struct {
-	Type       string     `json:"type"`
-	Credential Credential `json:"credential"`
+	Type string `json:"type"`
 
-	Services []string `json:"services"`
+	Credential Credential `json:"credential"`
+	Services   []string   `json:"services"`
+
+	CertificatePath string `json:"certificate_path"`
+	PrivateKeyPath  string `json:"private_key_path"`
+
+	OutputPath string `json:"output_path"`
 }
 
 type Credential struct {
 	SecretID  string `json:"secret_id"`
 	SecretKey string `json:"secret_key"`
+
+	ZoneToken string `json:"zone_token"`
+	AuthToken string `json:"auth_token"`
 }

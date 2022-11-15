@@ -3,3 +3,4 @@
 acme-task-config.json.asc
 acme-task-config.json
 /vendor
+/target

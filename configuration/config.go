@@ -13,6 +13,11 @@ func ReadConfig() (*model.Config, error) {
 	var bytes []byte
 	var err error
 
+	err = os.Setenv("LEGO_DISABLE_CNAME_SUPPORT", "true")
+	if err != nil {
+		return nil, err
+	}
+
 	acmeTaskConfigFilePath := utils.GetEnvVar("acme_task_config_file", "")
 	acmeTaskConfigFile := utils.GetEnvVar("acme_task_config", "")
 	if acmeTaskConfigFilePath != "" {

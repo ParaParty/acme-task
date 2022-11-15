@@ -5,15 +5,17 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/providers/dns/tencentcloud"
 	"github.com/paraparty/acme-task/acme"
 	"github.com/paraparty/acme-task/configuration"
 	"github.com/paraparty/acme-task/handler"
 	"github.com/paraparty/acme-task/model"
-	"log"
-	"time"
 )
 
 func main() {
@@ -23,6 +25,9 @@ func main() {
 	}
 
 	config, err := configuration.ReadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	user := &model.User{
 		Email: config.Acme.Email,
@@ -71,12 +76,29 @@ func doTask(config *model.Config, client *lego.Client, task *model.Task) error {
 
 	if task.TaskDetails.Type == "imagex" {
 		return handler.ImageXHandler(task, certificates)
+	} else if task.TaskDetails.Type == "file" {
+		return handler.CertFileHandler(task, certificates)
 	}
 	return fmt.Errorf("task type not support")
 }
 
 func resolveChallenge(client *lego.Client, task *model.Task) error {
-	if task.Challenge.Type == "tencent-cloud" {
+	if task.Challenge.Type == "cloudflare" {
+		cloudflareConfig := cloudflare.NewDefaultConfig()
+		cloudflareConfig.ZoneToken = task.Challenge.Credential.ZoneToken
+		cloudflareConfig.AuthToken = task.Challenge.Credential.AuthToken
+		cloudflareDnsProvider, err := cloudflare.NewDNSProviderConfig(cloudflareConfig)
+		if err != nil {
+			return err
+		}
+
+		err = client.Challenge.SetDNS01Provider(cloudflareDnsProvider)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	} else if task.Challenge.Type == "tencent-cloud" {
 		tencentCloudConfig := tencentcloud.NewDefaultConfig()
 		tencentCloudConfig.SecretID = task.Challenge.Credential.SecretID
 		tencentCloudConfig.SecretKey = task.Challenge.Credential.SecretKey
