@@ -25,6 +25,8 @@ func NewClient(config *model.Config, user *model.User) (*lego.Client, error) {
 		}
 	} else if config.Acme.Type == "test" {
 		acmeConfig.CADirURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	} else if config.Acme.Type == "r3" {
+		acmeConfig.CADirURL = "https://acme-v02.api.letsencrypt.org/directory"
 	} else {
 		return nil, fmt.Errorf("acme type invalid")
 	}

@@ -10,9 +10,8 @@ import (
 
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
-	"github.com/go-acme/lego/v4/providers/dns/tencentcloud"
 	"github.com/paraparty/acme-task/acme"
+	"github.com/paraparty/acme-task/acme/challenge"
 	"github.com/paraparty/acme-task/configuration"
 	"github.com/paraparty/acme-task/handler"
 	"github.com/paraparty/acme-task/model"
@@ -84,35 +83,11 @@ func doTask(config *model.Config, client *lego.Client, task *model.Task) error {
 
 func resolveChallenge(client *lego.Client, task *model.Task) error {
 	if task.Challenge.Type == "cloudflare" {
-		cloudflareConfig := cloudflare.NewDefaultConfig()
-		cloudflareConfig.ZoneToken = task.Challenge.Credential.ZoneToken
-		cloudflareConfig.AuthToken = task.Challenge.Credential.AuthToken
-		cloudflareDnsProvider, err := cloudflare.NewDNSProviderConfig(cloudflareConfig)
-		if err != nil {
-			return err
-		}
-
-		err = client.Challenge.SetDNS01Provider(cloudflareDnsProvider)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return challenge.CloudflareChallenge(client, task)
 	} else if task.Challenge.Type == "tencent-cloud" {
-		tencentCloudConfig := tencentcloud.NewDefaultConfig()
-		tencentCloudConfig.SecretID = task.Challenge.Credential.SecretID
-		tencentCloudConfig.SecretKey = task.Challenge.Credential.SecretKey
-		tencentCloudProvider, err := tencentcloud.NewDNSProviderConfig(tencentCloudConfig)
-		if err != nil {
-			return err
-		}
-
-		err = client.Challenge.SetDNS01Provider(tencentCloudProvider)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return challenge.TencentCloudChallenge(client, task)
+	} else if task.Challenge.Type == "imagex" {
+		return challenge.ImageXChallenge(client, task)
 	}
 
 	return fmt.Errorf("credential type not support")
