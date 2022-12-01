@@ -6,9 +6,13 @@ type UpdateHttpsRequest struct {
 }
 
 type UpdateHttpsItemRequest struct {
-	CertId      string `json:"cert_id"`
-	EnableHttp2 bool   `json:"enable_http2"`
-	EnableHttps bool   `json:"enable_https"`
+	CertId              string   `json:"cert_id"`
+	EnableHttp2         bool     `json:"enable_http2"`
+	EnableHttps         bool     `json:"enable_https"`
+	EnableForceRedirect bool     `json:"enable_force_redirect"`
+	RedirectCode        string   `json:"force_redirect_code"`
+	ForceRedirectType   string   `json:"force_redirect_type"`
+	TlsVersions         []string `json:"tls_versions"`
 }
 
 type AddCertRequest struct {

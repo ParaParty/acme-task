@@ -47,7 +47,7 @@ func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
 				continue
 			}
 
-			err := imagex.ConnectServiceDomain(imagexService, service.ServiceId, domain.DomainName, addedCert.CertId)
+			err := imagex.EnableServiceHttps(imagexService, service.ServiceId, domain.DomainName, addedCert.CertId)
 			if err != nil {
 				log.Printf("%v", err)
 				continue

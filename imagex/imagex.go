@@ -50,16 +50,20 @@ func AddCert(instance *imagex.ImageX, certificates *certificate.Resource) (*mode
 	return resp, err
 }
 
-func ConnectServiceDomain(instance *imagex.ImageX, serviceId string, domain string, certId string) error {
+func EnableServiceHttps(instance *imagex.ImageX, serviceId string, domain string, certId string) error {
 	query := url.Values{}
 	query.Add("ServiceId", serviceId)
 
 	req := &model.UpdateHttpsRequest{
 		Domain: domain,
 		Https: model.UpdateHttpsItemRequest{
-			CertId:      certId,
-			EnableHttp2: true,
-			EnableHttps: true,
+			CertId:              certId,
+			EnableHttp2:         true,
+			EnableHttps:         true,
+			EnableForceRedirect: true,
+			RedirectCode:        "301",
+			ForceRedirectType:   "http2https",
+			TlsVersions:         []string{"tlsv1.2", "tlsv1.3"},
 		},
 	}
 
