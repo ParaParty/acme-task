@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go/security v1.8.0
+	github.com/avast/retry-go/v4 v4.3.1
 	github.com/go-acme/lego/v4 v4.9.0
 	github.com/google/uuid v1.3.0
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.490

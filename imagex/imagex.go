@@ -37,7 +37,7 @@ func CreateImageXService() *imagex.ImageX {
 func AddCert(instance *imagex.ImageX, certificates *certificate.Resource) (*model.AddCertResponse, error) {
 	certSuffix, _ := uuid.NewUUID()
 	req := &model.AddCertRequest{
-		Name:    "auto-acme-task-" + time.Now().Format(time.RFC3339) + "-" + certSuffix.String(),
+		Name:    "auto-main-" + time.Now().Format(time.RFC3339) + "-" + certSuffix.String(),
 		Public:  string(certificates.Certificate),
 		Private: string(certificates.PrivateKey),
 	}

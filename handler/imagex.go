@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/paraparty/acme-task/imagex"
 	"github.com/paraparty/acme-task/model"
 	volc "github.com/volcengine/volc-sdk-golang/base"
+	volcImagex "github.com/volcengine/volc-sdk-golang/service/imagex"
 )
 
 func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
@@ -23,15 +26,37 @@ func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
 		SecretAccessKey: task.TaskDetails.Credential.SecretKey,
 	})
 
-	addedCert, err := imagex.AddCert(imagexService, certificates)
+	var addedCert *model.AddCertResponse
+	err := retry.Do(func() error {
+		var err error
+		addedCert, err = imagex.AddCert(imagexService, certificates)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Second*5), retry.OnRetry(func(n uint, err error) {
+		log.Printf("add cert error: retry:%d err:%+v", n, err)
+	}))
 	if err != nil {
 		return err
 	}
 
-	servicesInfo, err := imagexService.GetImageServices("")
+	var servicesInfo *volcImagex.GetServicesResult
+	err = retry.Do(func() error {
+		var err error
+		servicesInfo, err = imagexService.GetImageServices("")
+		if err != nil {
+			return err
+		}
+		return nil
+	}, retry.Attempts(3), retry.OnRetry(func(n uint, err error) {
+		log.Printf("get service info error: retry:%d err:%+v", n, err)
+	}))
 	if err != nil {
 		return err
 	}
+
+	time.Sleep(time.Second * 5)
 
 	for _, service := range servicesInfo.Services {
 		log.Printf("now processing service %s(%s)", service.ServiceName, service.ServiceId)
@@ -47,9 +72,17 @@ func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
 				continue
 			}
 
-			err := imagex.EnableServiceHttps(imagexService, service.ServiceId, domain.DomainName, addedCert.CertId)
-			if err != nil {
-				log.Printf("%v", err)
+			setCertErr := retry.Do(func() error {
+				retryErr := imagex.EnableServiceHttps(imagexService, service.ServiceId, domain.DomainName, addedCert.CertId)
+				if retryErr != nil {
+					return retryErr
+				}
+				return nil
+			}, retry.Attempts(3), retry.Delay(time.Second*5), retry.OnRetry(func(n uint, err error) {
+				log.Printf("set cert for %s(%s):%s retry:%d err:%+v", service.ServiceName, service.ServiceId, domain.DomainName, n, err)
+			}))
+			if setCertErr != nil {
+				log.Printf("%v", setCertErr)
 				continue
 			}
 
