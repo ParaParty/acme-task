@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -11,10 +12,12 @@ import (
 	"github.com/paraparty/acme-task/imagex"
 	"github.com/paraparty/acme-task/model"
 	volc "github.com/volcengine/volc-sdk-golang/base"
-	volcImagex "github.com/volcengine/volc-sdk-golang/service/imagex"
+	volcImagex "github.com/volcengine/volc-sdk-golang/service/imagex/v2"
 )
 
 func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
+	ctx := context.Background()
+
 	if len(task.Domains) <= 0 || len(task.TaskDetails.Services) <= 0 {
 		return fmt.Errorf("no need to run task")
 	}
@@ -41,10 +44,11 @@ func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
 		return err
 	}
 
-	var servicesInfo *volcImagex.GetServicesResult
+	var servicesInfoResp *volcImagex.GetAllImageServicesRes
+	getAllImageServicesQuery := &volcImagex.GetAllImageServicesQuery{}
 	err = retry.Do(func() error {
 		var err error
-		servicesInfo, err = imagexService.GetImageServices("")
+		servicesInfoResp, err = imagexService.GetAllImageServices(ctx, getAllImageServicesQuery)
 		if err != nil {
 			return err
 		}
@@ -58,35 +62,37 @@ func ImageXHandler(task *model.Task, certificates *certificate.Resource) error {
 
 	time.Sleep(time.Second * 5)
 
-	for _, service := range servicesInfo.Services {
-		log.Printf("now processing service %s(%s)", service.ServiceName, service.ServiceId)
+	servicesInfo := servicesInfoResp.Result
 
-		if !arrContains(task.TaskDetails.Services, service.ServiceId) {
-			log.Printf("skip service:%s(%s) for service id not hit", service.ServiceName, service.ServiceId)
+	for _, service := range servicesInfo.Services {
+		log.Printf("now processing service %s(%s)", service.ServiceName, service.ServiceID)
+
+		if !arrContains(task.TaskDetails.Services, service.ServiceID) {
+			log.Printf("skip service:%s(%s) for service id not hit", service.ServiceName, service.ServiceID)
 			continue
 		}
 
 		for _, domain := range service.DomainInfos {
 			if !checkDomain(task.Domains, domain.DomainName) {
-				log.Printf("skip service:%s(%s) for domain not hit", service.ServiceName, service.ServiceId)
+				log.Printf("skip service:%s(%s) for domain not hit", service.ServiceName, service.ServiceID)
 				continue
 			}
 
 			setCertErr := retry.Do(func() error {
-				retryErr := imagex.EnableServiceHttps(imagexService, service.ServiceId, domain.DomainName, addedCert.CertId)
+				retryErr := imagex.EnableServiceHttps(ctx, imagexService, service.ServiceID, domain.DomainName, addedCert.CertId)
 				if retryErr != nil {
 					return retryErr
 				}
 				return nil
 			}, retry.Attempts(3), retry.Delay(time.Second*5), retry.OnRetry(func(n uint, err error) {
-				log.Printf("set cert for %s(%s):%s retry:%d err:%+v", service.ServiceName, service.ServiceId, domain.DomainName, n, err)
+				log.Printf("set cert for %s(%s):%s retry:%d err:%+v", service.ServiceName, service.ServiceID, domain.DomainName, n, err)
 			}))
 			if setCertErr != nil {
 				log.Printf("%v", setCertErr)
 				continue
 			}
 
-			log.Printf("set cert for %s(%s):%s finished", service.ServiceName, service.ServiceId, domain.DomainName)
+			log.Printf("set cert for %s(%s):%s finished", service.ServiceName, service.ServiceID, domain.DomainName)
 		}
 	}
 

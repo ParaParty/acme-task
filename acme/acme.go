@@ -72,7 +72,6 @@ func getGoogleAcmeAuth(config *model.Config) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Use resp.
 	config.Acme.KeyId = resp.KeyId
 	config.Acme.HmacEncoded = string(resp.B64MacKey)
 	return nil

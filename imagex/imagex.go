@@ -1,6 +1,7 @@
 package imagex
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"time"
@@ -8,12 +9,11 @@ import (
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/google/uuid"
 	"github.com/paraparty/acme-task/model"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	volc "github.com/volcengine/volc-sdk-golang/base"
-	"github.com/volcengine/volc-sdk-golang/service/imagex"
+	imagex "github.com/volcengine/volc-sdk-golang/service/imagex/v2"
 )
 
-func CreateImageXService() *imagex.ImageX {
+func CreateImageXService() *imagex.Imagex {
 	instance := imagex.NewInstanceWithRegion(volc.RegionCnNorth1)
 	instance.ApiInfoList["AddCert"] = &volc.ApiInfo{
 		Method: http.MethodPost,
@@ -23,18 +23,10 @@ func CreateImageXService() *imagex.ImageX {
 			"Version": []string{"2018-08-01"},
 		},
 	}
-	instance.ApiInfoList["UpdateHttps"] = &volc.ApiInfo{
-		Method: http.MethodPost,
-		Path:   "/",
-		Query: url.Values{
-			"Action":  []string{"UpdateHttps"},
-			"Version": []string{"2018-08-01"},
-		},
-	}
 	return instance
 }
 
-func AddCert(instance *imagex.ImageX, certificates *certificate.Resource) (*model.AddCertResponse, error) {
+func AddCert(instance *imagex.Imagex, certificates *certificate.Resource) (*model.AddCertResponse, error) {
 	certSuffix, _ := uuid.NewUUID()
 	req := &model.AddCertRequest{
 		Name:    "auto-main-" + time.Now().Format(time.RFC3339) + "-" + certSuffix.String(),
@@ -50,28 +42,30 @@ func AddCert(instance *imagex.ImageX, certificates *certificate.Resource) (*mode
 	return resp, err
 }
 
-func EnableServiceHttps(instance *imagex.ImageX, serviceId string, domain string, certId string) error {
-	query := url.Values{}
-	query.Add("ServiceId", serviceId)
+func EnableServiceHttps(ctx context.Context, instance *imagex.Imagex, serviceId string, domain string, certId string) error {
+	req := &imagex.UpdateHTTPSReq{
 
-	req := &model.UpdateHttpsRequest{
-		Domain: domain,
-		Https: model.UpdateHttpsItemRequest{
-			CertId:              certId,
-			EnableHttp2:         true,
-			EnableHttps:         true,
-			EnableForceRedirect: true,
-			RedirectCode:        "301",
-			ForceRedirectType:   "http2https",
-			TlsVersions:         []string{"tlsv1.2", "tlsv1.3"},
+		UpdateHTTPSQuery: &imagex.UpdateHTTPSQuery{
+			ServiceID: serviceId,
+		},
+		UpdateHTTPSBody: &imagex.UpdateHTTPSBody{
+			Domain: domain,
+			HTTPS: &imagex.UpdateHTTPSBodyHTTPS{
+				CertID:              certId,
+				EnableHTTP2:         true,
+				EnableHTTPS:         true,
+				EnableForceRedirect: true,
+				ForceRedirectCode:   "301",
+				ForceRedirectType:   "http2https",
+				TLSVersions:         []string{"tlsv1.2", "tlsv1.3"},
+			},
 		},
 	}
 
-	resp := common.StringPtr("")
-
-	err := instance.ImageXPost("UpdateHttps", query, req, resp)
+	_, err := instance.UpdateHTTPS(ctx, req)
 	if err != nil {
 		return err
 	}
-	return err
+
+	return nil
 }

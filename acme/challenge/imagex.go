@@ -1,13 +1,14 @@
 package challenge
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/paraparty/acme-task/imagex"
 	"github.com/paraparty/acme-task/model"
 	volc "github.com/volcengine/volc-sdk-golang/base"
-	volcImageX "github.com/volcengine/volc-sdk-golang/service/imagex"
+	volcImageX "github.com/volcengine/volc-sdk-golang/service/imagex/v2"
 )
 
 func ImageXChallenge(client *lego.Client, task *model.Task) error {
@@ -35,7 +36,7 @@ func ImageXChallenge(client *lego.Client, task *model.Task) error {
 }
 
 type imagexChallenge struct {
-	Service       *volcImageX.ImageX
+	Service       *volcImageX.Imagex
 	DomainMapping map[string]string
 }
 
@@ -70,7 +71,16 @@ func (c *imagexChallenge) CleanUp(domain, token, keyAuth string) error {
 		return fmt.Errorf("%s not found in ImageX", domain)
 	}
 
-	_, err := c.Service.DeleteImages(serviceId, []string{path})
+	req := volcImageX.DeleteImageUploadFilesReq{
+		DeleteImageUploadFilesQuery: &volcImageX.DeleteImageUploadFilesQuery{
+			ServiceID: serviceId,
+		},
+		DeleteImageUploadFilesBody: &volcImageX.DeleteImageUploadFilesBody{
+			StoreUris: []string{path},
+		},
+	}
+
+	_, err := c.Service.DeleteImageUploadFiles(context.Background(), &req)
 	if err != nil {
 		return err
 	}
@@ -79,16 +89,18 @@ func (c *imagexChallenge) CleanUp(domain, token, keyAuth string) error {
 }
 
 func (c *imagexChallenge) init() error {
-	services, err := c.Service.GetImageServices("")
+	getAllImageServicesQuery := &volcImageX.GetAllImageServicesQuery{}
+	servicesResp, err := c.Service.GetAllImageServices(context.Background(), getAllImageServicesQuery)
 	if err != nil {
 		return err
 	}
+	services := servicesResp.Result
 
 	c.DomainMapping = make(map[string]string, 0)
 
 	for _, item := range services.Services {
 		for _, domain := range item.DomainInfos {
-			c.DomainMapping[domain.DomainName] = item.ServiceId
+			c.DomainMapping[domain.DomainName] = item.ServiceID
 		}
 	}
 	return nil
