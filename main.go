@@ -61,7 +61,7 @@ func doTask(config *model.Config, client *lego.Client, task *model.Task) error {
 		if config.Acme.ValidityPeriod != "" {
 			duration, err := time.ParseDuration(config.Acme.ValidityPeriod)
 			if err == nil {
-				request.NotAfter = time.Now().Add(duration).Format(time.RFC3339)
+				request.NotAfter = time.Now().Add(duration)
 			} else {
 				log.Printf("ValidityPeriod is not acceptable, %v", err)
 			}
